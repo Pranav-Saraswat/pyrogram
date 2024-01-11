@@ -25,7 +25,7 @@ import pyrogram
 from pyrogram import raw, enums
 from pyrogram import types
 from pyrogram import utils
-from pyrogram.errors import MessageIdsEmpty, PeerIdInvalid, ChannelPrivate
+from pyrogram.errors import MessageIdsEmpty, PeerIdInvalid, ChannelPrivate, BotMethodInvalid, ChannelForumMissing
 from pyrogram.parser import utils as parser_utils, Parser
 from ..object import Object
 from ..update import Update
@@ -140,12 +140,17 @@ class Message(Object, Update):
             You can use ``media = getattr(message, message.media.value)`` to access the media message.
 
         invert_media (``bool``, *optional*):
-            Invert media.
+            If True, link preview will be shown above the message text.
+            Otherwise, the link preview will be shown below the message text.
 
         edit_date (:py:obj:`~datetime.datetime`, *optional*):
             Date the message was last edited.
 
-        media_group_id (``str``, *optional*):
+        edit_hidden (``bool``, *optional*):
+            The message shown as not modified.
+            A message can be not modified in case it has received a reaction.
+
+        media_group_id (``int``, *optional*):
             The unique identifier of a media message group this message belongs to.
 
         author_signature (``str``, *optional*):
@@ -201,7 +206,7 @@ class Message(Object, Update):
         giveaway (:obj:`~pyrogram.types.Giveaway`, *optional*):
             Message is a giveaway, information about the giveaway.
 
-        story (:obj:`~pyrogram.types.MessageStory`, *optional*):
+        story (:obj:`~pyrogram.types.Story`, *optional*):
             Message is a story, information about the story.
 
         video (:obj:`~pyrogram.types.Video`, *optional*):
@@ -352,8 +357,8 @@ class Message(Object, Update):
         gift_code (:obj:`~pyrogram.types.GiftCode`, *optional*):
             Service message: gift code information.
 
-        requested_chat (:obj:`~pyrogram.types.Chat`, *optional*):
-            Service message: requested chat information.
+        requested_chats (List of :obj:`~pyrogram.types.Chat`, *optional*):
+            Service message: requested chats information.
 
         reply_markup (:obj:`~pyrogram.types.InlineKeyboardMarkup` | :obj:`~pyrogram.types.ReplyKeyboardMarkup` | :obj:`~pyrogram.types.ReplyKeyboardRemove` | :obj:`~pyrogram.types.ForceReply`, *optional*):
             Additional interface options. An object for an inline keyboard, custom reply keyboard,
@@ -399,7 +404,8 @@ class Message(Object, Update):
         media: "enums.MessageMediaType" = None,
         invert_media: bool = None,
         edit_date: datetime = None,
-        media_group_id: str = None,
+        edit_hidden: bool = None,
+        media_group_id: int = None,
         author_signature: str = None,
         has_protected_content: bool = None,
         has_media_spoiler: bool = None,
@@ -415,7 +421,8 @@ class Message(Object, Update):
         animation: "types.Animation" = None,
         game: "types.Game" = None,
         giveaway: "types.Giveaway" = None,
-        story: "types.MessageStory" = None,
+        giveaway_result: "types.GiveawayResult" = None,
+        story: "types.Story" = None,
         video: "types.Video" = None,
         voice: "types.Voice" = None,
         video_note: "types.VideoNote" = None,
@@ -457,7 +464,7 @@ class Message(Object, Update):
         video_chat_members_invited: "types.VideoChatMembersInvited" = None,
         web_app_data: "types.WebAppData" = None,
         gift_code: "types.GiftCode" = None,
-        requested_chat: "types.Chat" = None,
+        requested_chats: List["types.Chat"] = None,
         giveaway_launched: bool = None,
         reply_markup: Union[
             "types.InlineKeyboardMarkup",
@@ -496,6 +503,7 @@ class Message(Object, Update):
         self.media = media
         self.invert_media = invert_media
         self.edit_date = edit_date
+        self.edit_hidden = edit_hidden
         self.media_group_id = media_group_id
         self.author_signature = author_signature
         self.has_protected_content = has_protected_content
@@ -512,6 +520,7 @@ class Message(Object, Update):
         self.animation = animation
         self.game = game
         self.giveaway = giveaway
+        self.giveaway_result = giveaway_result
         self.story = story
         self.video = video
         self.voice = voice
@@ -555,7 +564,7 @@ class Message(Object, Update):
         self.video_chat_members_invited = video_chat_members_invited
         self.web_app_data = web_app_data
         self.gift_code = gift_code
-        self.requested_chat = requested_chat
+        self.requested_chats = requested_chats
         self.giveaway_launched = giveaway_launched
         self.reactions = reactions
 
@@ -619,7 +628,7 @@ class Message(Object, Update):
             web_app_data = None
             gift_code = None
             giveaway_launched = None
-            requested_chat = None
+            requested_chats = None
 
             service_type = None
 
@@ -699,15 +708,29 @@ class Message(Object, Update):
                 gift_code = types.GiftCode._parse(client, action, chats)
                 service_type = enums.MessageServiceType.GIFT_CODE
             elif isinstance(action, raw.types.MessageActionRequestedPeer):
-                chat_id = utils.get_raw_peer_id(message.action.peer)
+                _requested_chats = []
 
-                if isinstance(message.peer_id, raw.types.PeerUser):
-                    requested_chat = types.Chat._parse_user_chat(client, users[chat_id])
+                for requested_peer in action.peers:
+                    chat_id = utils.get_peer_id(requested_peer)
+                    peer_type = utils.get_peer_type(chat_id)
 
-                if isinstance(message.peer_id, raw.types.PeerChat):
-                    requested_chat = types.Chat._parse_chat_chat(client, chats[chat_id])
+                    if peer_type == "user":
+                        chat_type = enums.ChatType.PRIVATE
+                    elif peer_type == "chat":
+                        chat_type = enums.ChatType.GROUP
+                    else:
+                        chat_type = enums.ChatType.CHANNEL
 
-                requested_chat = types.Chat._parse_channel_chat(client, chats[chat_id])
+                    _requested_chats.append(
+                        types.Chat(
+                            id=chat_id,
+                            type=chat_type,
+                            client=client
+                        )
+                    )
+
+                requested_chats = types.List(_requested_chats) or None
+
                 service_type = enums.MessageServiceType.REQUESTED_CHAT
 
             from_user = types.User._parse(client, users.get(user_id, None))
@@ -744,7 +767,7 @@ class Message(Object, Update):
                 web_app_data=web_app_data,
                 giveaway_launched=giveaway_launched,
                 gift_code=gift_code,
-                requested_chat=requested_chat,
+                requested_chats=requested_chats,
                 client=client
                 # TODO: supergroup_chat_created
             )
@@ -778,12 +801,11 @@ class Message(Object, Update):
 
             client.message_cache[(parsed_message.chat.id, parsed_message.id)] = parsed_message
 
-            if message.reply_to:
-                if message.reply_to.forum_topic:
-                    if message.reply_to.reply_to_top_id:
-                        parsed_message.message_thread_id = message.reply_to.reply_to_top_id
-                    else:
-                        parsed_message.message_thread_id = message.reply_to.reply_to_msg_id
+            if message.reply_to and message.reply_to.forum_topic:
+                if message.reply_to.reply_to_top_id:
+                    parsed_message.message_thread_id = message.reply_to.reply_to_top_id
+                else:
+                    parsed_message.message_thread_id = message.reply_to.reply_to_msg_id
 
             return parsed_message
 
@@ -823,6 +845,7 @@ class Message(Object, Update):
             venue = None
             game = None
             giveaway = None
+            giveaway_result = None
             story = None
             audio = None
             voice = None
@@ -859,8 +882,18 @@ class Message(Object, Update):
                 elif isinstance(media, raw.types.MessageMediaGiveaway):
                     giveaway = types.Giveaway._parse(client, media, chats)
                     media_type = enums.MessageMediaType.GIVEAWAY
+                elif isinstance(media, raw.types.MessageMediaGiveawayResults):
+                    giveaway_result = await types.GiveawayResult._parse(client, media, users, chats)
+                    media_type = enums.MessageMediaType.GIVEAWAY_RESULT
                 elif isinstance(media, raw.types.MessageMediaStory):
-                    story = types.MessageStory._parse(client, media, users, chats)
+                    if media.story:
+                        story = await types.Story._parse(client, media.story, users, chats, media.peer)
+                    else:
+                        try:
+                            story = await client.get_stories(utils.get_peer_id(media.peer), media.id)
+                        except (BotMethodInvalid, ChannelPrivate):
+                            story = await types.Story._parse(client, media, users, chats, media.peer)
+
                     media_type = enums.MessageMediaType.STORY
                 elif isinstance(media, raw.types.MessageMediaDocument):
                     doc = media.document
@@ -906,7 +939,14 @@ class Message(Object, Update):
                             media_type = enums.MessageMediaType.DOCUMENT
                 elif isinstance(media, raw.types.MessageMediaWebPage):
                     if isinstance(media.webpage, raw.types.WebPage):
-                        web_page = types.WebPage._parse(client, media.webpage, media.force_large_media, media.force_small_media, media.manual)
+                        web_page = types.WebPage._parse(
+                            client,
+                            media.webpage,
+                            getattr(media, "force_large_media", None),
+                            getattr(media, "force_small_media", None),
+                            getattr(media, "manual", None),
+                            getattr(media, "safe", None)
+                        )
                         media_type = enums.MessageMediaType.WEB_PAGE
                     else:
                         media = None
@@ -980,6 +1020,7 @@ class Message(Object, Update):
                 media=media_type,
                 invert_media=getattr(message, "invert_media", None),
                 edit_date=utils.timestamp_to_datetime(message.edit_date),
+                edit_hidden=message.edit_hide,
                 media_group_id=message.grouped_id,
                 photo=photo,
                 location=location,
@@ -990,6 +1031,7 @@ class Message(Object, Update):
                 animation=animation,
                 game=game,
                 giveaway=giveaway,
+                giveaway_result=giveaway_result,
                 story=story,
                 video=video,
                 video_note=video_note,
@@ -1018,16 +1060,11 @@ class Message(Object, Update):
                             parsed_message.reply_to_message_id = message.reply_to.reply_to_msg_id
                         else:
                             thread_id = message.reply_to.reply_to_msg_id
+
                         parsed_message.message_thread_id = thread_id
+
                         if topics:
-                            parsed_message.topic = types.ForumTopic._parse(topics[thread_id])
-                        else:
-                            try:
-                                msg = await client.get_messages(parsed_message.chat.id,message.id)
-                                if msg.topic:
-                                    parsed_message.topic = msg.topic
-                            except Exception:
-                                pass
+                            parsed_message.topic = types.ForumTopic._parse(client, topics[thread_id], users=users, chats=chats)
                     else:
                         if message.reply_to.quote:
                             quote_entities = [types.MessageEntity._parse(client, entity, users) for entity in message.reply_to.quote_entities]
@@ -1044,6 +1081,7 @@ class Message(Object, Update):
                                 if media is None or web_page is not None
                                 else None
                             )
+
                         parsed_message.reply_to_message_id = message.reply_to.reply_to_msg_id
                         parsed_message.reply_to_top_message_id = message.reply_to.reply_to_top_id
                 else:
@@ -1082,10 +1120,19 @@ class Message(Object, Update):
                                 parsed_message.reply_to_story_user_id,
                                 parsed_message.reply_to_story_id
                             )
-                        except Exception:
+                        except BotMethodInvalid:
                             pass
                         else:
                             parsed_message.reply_to_story = reply_to_story
+
+            if parsed_message.topic is None and parsed_message.chat.is_forum:
+                try:
+                    parsed_message.topic = await client.get_forum_topics_by_id(
+                        chat_id=parsed_message.chat.id,
+                        topic_ids=parsed_message.message_thread_id or 1
+                    )
+                except (BotMethodInvalid, ChannelForumMissing):
+                    pass
 
             if not parsed_message.poll:  # Do not cache poll messages
                 client.message_cache[(parsed_message.chat.id, parsed_message.id)] = parsed_message
@@ -1140,6 +1187,7 @@ class Message(Object, Update):
         disable_web_page_preview: bool = None,
         disable_notification: bool = None,
         message_thread_id: int = None,
+        invert_media: bool = None,
         reply_to_message_id: int = None,
         quote_text: str = None,
         quote_entities: List["types.MessageEntity"] = None,
@@ -1193,6 +1241,10 @@ class Message(Object, Update):
                 Unique identifier of a message thread to which the message belongs.
                 For supergroups only.
 
+            invert_media (``bool``, *optional*):
+                If True, link preview will be shown above the message text.
+                Otherwise, the link preview will be shown below the message text.
+
             reply_to_message_id (``int``, *optional*):
                 If the message is a reply, ID of the original message.
 
@@ -1235,6 +1287,7 @@ class Message(Object, Update):
             disable_web_page_preview=disable_web_page_preview,
             disable_notification=disable_notification,
             message_thread_id=message_thread_id,
+            invert_media=invert_media,
             reply_to_message_id=reply_to_message_id,
             quote_text=quote_text,
             quote_entities=quote_entities,
@@ -3226,6 +3279,7 @@ class Message(Object, Update):
         reply_to_message_id: int = None,
         quote_text: str = None,
         quote_entities: List["types.MessageEntity"] = None,
+        ttl_seconds: int = None,
         reply_markup: Union[
             "types.InlineKeyboardMarkup",
             "types.ReplyKeyboardMarkup",
@@ -3293,6 +3347,11 @@ class Message(Object, Update):
             quote_entities (List of :obj:`~pyrogram.types.MessageEntity`):
                 List of special entities that appear in quote text, which can be specified instead of *parse_mode*.
 
+            ttl_seconds (``int``, *optional*):
+                Self-Destruct Timer.
+                If you set a timer, the voice note will self-destruct in *ttl_seconds*
+                seconds after it was listened.
+
             reply_markup (:obj:`~pyrogram.types.InlineKeyboardMarkup` | :obj:`~pyrogram.types.ReplyKeyboardMarkup` | :obj:`~pyrogram.types.ReplyKeyboardRemove` | :obj:`~pyrogram.types.ForceReply`, *optional*):
                 Additional interface options. An object for an inline keyboard, custom reply keyboard,
                 instructions to remove reply keyboard or to force a reply from the user.
@@ -3348,6 +3407,7 @@ class Message(Object, Update):
             reply_to_message_id=reply_to_message_id,
             quote_text=quote_text,
             quote_entities=quote_entities,
+            ttl_seconds=ttl_seconds,
             reply_markup=reply_markup,
             progress=progress,
             progress_args=progress_args
@@ -3985,7 +4045,7 @@ class Message(Object, Update):
         else:
             await self.reply(button, quote=quote)
 
-    async def react(self, emoji: Union[int, str] = None, big: bool = False) -> bool:
+    async def react(self, emoji: Union[int, str, List[Union[int, str]]] = None, big: bool = False) -> bool:
         """Bound method *react* of :obj:`~pyrogram.types.Message`.
 
         Use as a shortcut for:
@@ -4004,9 +4064,10 @@ class Message(Object, Update):
                 await message.react(emoji="🔥")
 
         Parameters:
-            emoji (``str``, *optional*):
+            emoji (``int`` | ``str`` | List of ``int`` | ``str``, *optional*):
                 Reaction emoji.
-                Pass "" as emoji (default) to retract the reaction.
+                Pass None as emoji (default) to retract the reaction.
+                Pass list of int or str to react multiple emojis.
 
             big (``bool``, *optional*):
                 Pass True to show a bigger and longer reaction.

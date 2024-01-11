@@ -19,23 +19,40 @@
 from ..object import Object
 
 
-class RequestPeerTypeUserInfo(Object):
+class RequestUserInfo(Object):
     """Contains information about a user peer type.
 
     Parameters:
-        is_bot (``bool``):
-            If True, returns the list of users where user is a bot.
+        button_id (``int``):
+            Identifier of button.
 
-        is_premium (``bool``):
-            If True, returns the list of users where user has premium.
+        is_bot (``bool``, *optional*):
+            If True, returns bots.
+            If False to returns regular users.
+            If not specified, no additional restrictions are applied.
+            Defaults to None.
+
+        is_premium (``bool``, *optional*):
+            If True, returns premium users.
+            If False to request non-premium users.
+            If not specified, no additional restrictions are applied.
+            Defaults to None.
+
+        max_quantity(``int``, *optional*):
+            The maximum number of users to be selected; 1-10. Defaults to 1.
+            Defaults to None (One peer only).
     """
 
     def __init__(
         self, *,
+        button_id: int,
         is_bot: bool = None,
         is_premium: bool = None,
+        max_quantity: int = None,
     ):
         super().__init__()
 
+        self.button_id = button_id
         self.is_bot = is_bot
         self.is_premium = is_premium
+        self.max_quantity = max_quantity or 1

@@ -21,15 +21,14 @@ from typing import Union
 import pyrogram
 from pyrogram import raw
 from pyrogram import enums
-from pyrogram import types
 
 class UpdateColor:
     async def update_color(
         self: "pyrogram.Client",
         chat_id: Union[int, str],
-        color: "enums.ProfileColor",
+        color: Union["enums.ReplyColor", "enums.ProfileColor"],
         background_emoji_id: int = None
-    ) -> "types.Chat":
+    ) -> bool:
         """Update color
 
         .. include:: /_includes/usable-by/users.rst
@@ -38,41 +37,40 @@ class UpdateColor:
             chat_id (``int`` | ``str``):
                 Unique identifier (int) or username (str) of the target chat.
 
-            color (:obj:`~pyrogram.enums.ProfileColor`):
+            color (:obj:`~pyrogram.enums.ReplyColor` | :obj:`~pyrogram.enums.ProfileColor`):
                 Color type.
+                Pass :obj:`~pyrogram.enums.ReplyColor` to set reply color or
+                :obj:`~pyrogram.enums.ProfileColor` to set profile color.
 
             background_emoji_id (``int``, *optional*):
                 Unique identifier of the custom emoji.
 
         Returns:
-            :obj:`~pyrogram.types.Chat`: On success, a chat object is returned.
+            ``bool``: On success, in case the passed-in session is authorized, True is returned.
 
         Example:
             .. code-block:: python
 
-                await app.update_color(chat_id, 1)
+                await app.update_color(chat_id, enums.ReplyColor.RED)
         """
-
         peer = await self.resolve_peer(chat_id)
 
         if isinstance(peer, raw.types.InputPeerSelf):
-            await self.invoke(
+            r = await self.invoke(
                 raw.functions.account.UpdateColor(
-                    color=color,
+                    for_profile=isinstance(color, enums.ProfileColor),
+                    color=color.value,
                     background_emoji_id=background_emoji_id
                 )
             )
-
-            r = await self.invoke(raw.functions.users.GetUsers(id=[raw.types.InputPeerSelf()]))
-            chat = r[0]
         else:
             r = await self.invoke(
                 raw.functions.channels.UpdateColor(
                     channel=peer,
-                    color=color,
+                    for_profile=isinstance(color, enums.ProfileColor),
+                    color=color.value,
                     background_emoji_id=background_emoji_id
                 )
             )
-            chat = r.chats[0]
 
-        return types.Chat._parse_chat(self, chat)
+        return bool(r)

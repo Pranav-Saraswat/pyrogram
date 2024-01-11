@@ -195,6 +195,7 @@ def pyrogram_api():
             get_discussion_replies
             get_discussion_replies_count
             get_custom_emoji_stickers
+            send_web_page
         """,
         chats="""
         Chats
@@ -248,9 +249,11 @@ def pyrogram_api():
             toggle_forum_topics
             delete_folder
             export_folder_link
-            get_folder
             get_folders
             update_folder
+            get_similar_channels
+            join_folder
+            leave_folder
         """,
         users="""
         Users
@@ -267,6 +270,7 @@ def pyrogram_api():
             get_common_chats
             get_default_emoji_statuses
             set_emoji_status
+            update_status
         """,
         invite_links="""
         Invite Links
@@ -347,20 +351,24 @@ def pyrogram_api():
         """,
         stories="""
         Stories
+            can_send_story
+            copy_story
             delete_stories
-            edit_story
+            edit_story_caption
+            edit_story_media
+            edit_story_privacy
             export_story_link
+            forward_story
             get_all_stories
+            get_chat_stories
+            get_pinned_stories
             get_stories_archive
+            get_stories
+            hide_stories
             increment_story_views
+            pin_stories
             read_stories
             send_story
-            pin_stories
-            hide_stories
-            can_send_story
-            get_pinned_stories
-            copy_story
-            forward_story
         """,
         premium="""
         Premium
@@ -426,6 +434,7 @@ def pyrogram_api():
             Restriction
             EmojiStatus
             Folder
+            ChatColor
         """,
         messages_media="""
         Messages & Media
@@ -456,14 +465,11 @@ def pyrogram_api():
             WebAppData
             MessageReactions
             ChatReactions
-            MessageStory
             Story
-            StoryDeleted
-            StorySkipped
-            StoryViews
             MyBoost
             BoostsStatus
             Giveaway
+            GiveawayResult
             GiftCode
         """,
         bot_keyboards="""
@@ -485,10 +491,10 @@ def pyrogram_api():
             MenuButtonDefault
             SentWebAppMessage
             ForumTopic
-            RequestPeerTypeBroadcastInfo
-            RequestPeerTypeChatInfo
-            RequestPeerTypeUserInfo
-            RequestPeerPollInfo
+            RequestChannelInfo
+            RequestChatInfo
+            RequestUserInfo
+            RequestPollInfo
         """,
         bot_commands="""
         Bot commands
@@ -633,6 +639,7 @@ def pyrogram_api():
             Chat.unpin_all_messages
             Chat.mute
             Chat.unmute
+            Chat.set_ttl
         """,
         user="""
         User
@@ -671,7 +678,8 @@ def pyrogram_api():
             Story.reply_video_note
             Story.reply_voice
             Story.delete
-            Story.edit
+            Story.download
+            Story.edit_media
             Story.edit_caption
             Story.edit_privacy
             Story.export_link
@@ -683,10 +691,11 @@ def pyrogram_api():
         folder="""
         Folder
             Folder.delete
-            Folder.update_peers
-            Folder.pin_chat
+            Folder.update
             Folder.include_chat
             Folder.exclude_chat
+            Folder.pin_chat
+            Folder.remove_chat
             Folder.export_link
         """
     )

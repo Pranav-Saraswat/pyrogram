@@ -29,6 +29,10 @@ class ExportFolderLink:
 
         .. include:: /_includes/usable-by/users.rst
 
+        Parameters:
+            folder_id (``int``):
+                Unique identifier (int) of the target folder.
+
         Returns:
             ``str``: On success, a link to the folder as string is returned.
 
@@ -36,22 +40,29 @@ class ExportFolderLink:
             .. code-block:: python
 
                 # Export folder link
-                app.export_folder_link(123456789)
+                app.export_folder_link(folder_id)
         """
-        folder = await self.get_folder(folder_id)
+        folder = await self.get_folders(folder_id)
 
         if not folder:
             return
 
+        peers = []
+
+        if folder.included_chats:
+            peers.extend(iter(folder.included_chats))
+
+        if folder.excluded_chats:
+            peers.extend(iter(folder.included_chats))
+
+        if folder.pinned_chats:
+            peers.extend(iter(folder.included_chats))
+
         r = await self.invoke(
             raw.functions.chatlists.ExportChatlistInvite(
-                chatlist=raw.types.InputChatlistDialogFilter(
-                    filter_id=folder_id
-                ),
+                chatlist=raw.types.InputChatlistDialogFilter(filter_id=folder_id),
                 title=folder.title,
-                peers=[await self.resolve_peer(i.id) for i in folder.pinned_peers] if folder.pinned_peers else []
-                + [await self.resolve_peer(i.id) for i in folder.included_peers] if folder.included_peers else []
-                + [await self.resolve_peer(i.id) for i in folder.excluded_peers] if folder.excluded_peers else [],
+                peers=[await self.resolve_peer(i.id) for i in peers],
             )
         )
 
